@@ -1,0 +1,41 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+      url "http://repo.akka.io/snapshots/"
+    }
+}
+
+apply plugin: 'scala'
+apply plugin: 'java'
+apply plugin: 'idea'
+
+jar {
+    baseName = 'TrafficTracerServiceWorker'
+    version =  '0.1.0'
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+ 
+dependencies {
+    compile 'org.scala-lang:scala-library:2.11.8'
+}
+ 
+tasks.withType(ScalaCompile) {
+    scalaCompileOptions.useAnt = false
+}
+ 
+dependencies {
+      // Local
+    compile project(':TrafficTrackerServiceCommon')
+
+    // Akka related
+    compile group: 'com.typesafe.akka', name: 'akka-actor_2.11', version: '2.5-SNAPSHOT'
+    compile group: 'org.scala-lang', name: 'scala-library', version: '2.11.8'
+}

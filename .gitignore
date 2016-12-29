@@ -1,0 +1,5 @@
+*.iml
+*.log
+build
+.gradle
+src/main/target

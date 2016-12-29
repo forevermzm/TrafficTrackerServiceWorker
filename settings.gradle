@@ -1,0 +1,2 @@
+include ':TrafficTrackerServiceCommon'
+project(':TrafficTrackerServiceCommon').projectDir = new File(settingsDir, '../TrafficTrackerServiceCommon')
