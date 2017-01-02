@@ -16,7 +16,7 @@ public abstract class Report {
     public abstract List<SrcDestPair> getCalculatedPairs();
 
     @Value.Default
-    public boolean getTimedout() {
+    public boolean isTimedout() {
         return false;
     }
 

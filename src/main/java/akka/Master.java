@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class Master extends UntypedActor {
     public static final String START_WORK = "START_WORK";
@@ -56,14 +57,16 @@ public class Master extends UntypedActor {
     public Master(int workers, ActorRef reporter) {
         this.reporter = reporter;
 
-        List<Routee> routees = new ArrayList<>();
         jobWorkers = new ArrayList<>();
         for (int i = 0; i < workers; i++) {
             ActorRef r = getContext().actorOf(Props.create(Worker.class));
             jobWorkers.add(r);
-            getContext().watch(r);
-            routees.add(new ActorRefRoutee(r));
         }
+
+        jobWorkers.stream().forEach(getContext()::watch);
+        List<Routee> routees = jobWorkers.stream()
+                .map(a -> new ActorRefRoutee(a))
+                .collect(Collectors.toList());
 
         masterStartTime = Instant.now();
         router = new Router(new RoundRobinRoutingLogic(), routees);
@@ -90,10 +93,11 @@ public class Master extends UntypedActor {
             scheduleSnapshot();
         } else if (message instanceof SnapshotResult) {
             Instant snapshotFinished = Instant.now();
-            LOG.info("Snapshot job finished at: " + snapshotFinished);
+            LOG.info("Snapshot job finished at: " + snapshotFinished + " with snapshot: " + message);
             reportBuilder.putStepDurations(SNAPSHOT_WORK, Duration.between(stepStartTime, snapshotFinished));
             snapshotResult = (SnapshotResult) message;
             if (noWorkNeeded(snapshotResult)) {
+                LOG.info("No work is needed for this round.");
                 reportAndShutdown();
             }
             stepStartTime = Instant.now();
