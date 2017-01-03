@@ -40,7 +40,18 @@ dependencies {
     compile group: 'org.scala-lang', name: 'scala-library', version: '2.11.8'
 }
 
+apply plugin: 'application'
+mainClassName = "main.Application"
+
 run {
     jvmArgs = ["-DgoogleApiKey=YOUR_GOOGLE_API_KEY",    // Go to https://console.developers.google.com/apis/dashboard?project to enable google api for Google Maps GeoCoding & Directions
                "-Dlog4j.configurationFile=src/main/java/log4j2.xml"]
 }
+//task run (type: JavaExec, dependsOn: classes){
+//    if(System.getProperty("exec.args") != null) {
+//        args System.getProperty("exec.args").split()
+//    }
+//    description = "Run TrafficTracerServiceWorker"
+//    main = "main.Application"
+//    classpath = sourceSets.main.runtimeClasspath
+//}
