@@ -24,26 +24,28 @@ public class TrafficStatusSystem {
 
     private final ScheduledExecutorService scheduler;
 
+    private final ActorSystem actorSystem;
+    private final ActorRef reporter;
+    private final ActorRef master;
+
     public TrafficStatusSystem(int numWorkers, ScheduledExecutorService scheduler) {
         checkArgument(numWorkers > 0);
         this.numWorkers = numWorkers;
         this.scheduler = checkNotNull(scheduler);
+
+        this.actorSystem = ActorSystem.create("TrafficStatusSystem");
+        this.reporter = actorSystem.actorOf(Props.create(Reporter.class), "reporter");
+        master = actorSystem.actorOf(Master.props(numWorkers, reporter));
     }
 
     public void start() {
+        LOG.info("Starting traffic status system.");
+
         scheduler.scheduleAtFixedRate(() -> doWork(), INITIAL_DELAY, SCHEDULE_INTERVAL, TimeUnit.MINUTES);
     }
 
     private void doWork() {
         try {
-            LOG.info("Starting traffic status system.");
-
-            ActorSystem system = ActorSystem.create("TrafficStatusSystem");
-
-            final ActorRef reporter = system.actorOf(Props.create(Reporter.class), "reporter");
-
-            ActorRef master = system.actorOf(Master.props(numWorkers, reporter));
-
             master.tell(Master.START_WORK, reporter);
         } catch (Exception e) {
             // Don't rethrow the exception.

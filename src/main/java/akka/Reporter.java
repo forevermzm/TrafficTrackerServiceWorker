@@ -17,9 +17,9 @@ public class Reporter extends UntypedActor {
             Report report = (Report) message;
             LOG.info("Work finished with report: " + report);
 
-            getContext().become(shuttingDown);
-
-            LOG.info("Terminated reporter: " + getSelf());
+//            getContext().become(shuttingDown);
+//
+//            LOG.info("Terminated reporter: " + getSelf());
         } else {
             unhandled(message);
         }

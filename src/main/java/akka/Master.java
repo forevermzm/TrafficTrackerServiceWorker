@@ -40,11 +40,11 @@ public class Master extends UntypedActor {
 
     private final ActorRef reporter;
 
-    private final ImmutableReport.Builder reportBuilder;
+    private ImmutableReport.Builder reportBuilder;
 
     private Router router;
 
-    private final Instant masterStartTime;
+    private Instant masterStartTime;
 
     private Instant stepStartTime;
 
@@ -68,10 +68,7 @@ public class Master extends UntypedActor {
                 .map(a -> new ActorRefRoutee(a))
                 .collect(Collectors.toList());
 
-        masterStartTime = Instant.now();
         router = new Router(new RoundRobinRoutingLogic(), routees);
-        reportBuilder = Report.builder();
-        finishedPairs = new HashSet<>();
     }
 
     public static Props props(final int workers, final ActorRef reporter) {
@@ -88,6 +85,7 @@ public class Master extends UntypedActor {
     @Override
     public void onReceive(Object message) throws Throwable {
         if (Objects.equals(message, START_WORK)) {
+            masterStartTime = Instant.now();
             stepStartTime = Instant.now();
             LOG.info("Starting master at: " + stepStartTime);
             scheduleSnapshot();
@@ -108,6 +106,7 @@ public class Master extends UntypedActor {
             if (finishedPairs.size() == snapshotResult.getAddressPairs().size()) {
                 Instant calculateFinished = Instant.now();
                 LOG.info("Calculate job finished at: " + calculateFinished);
+                reportBuilder.addAllCalculatedPairs(finishedPairs);
                 reportBuilder.putStepDurations("CALCULATE", Duration.between(stepStartTime, calculateFinished));
                 reportAndShutdown();
             }
@@ -125,6 +124,7 @@ public class Master extends UntypedActor {
     }
 
     private void scheduleCalculateWork(SnapshotResult snapshot) {
+        finishedPairs = new HashSet<>();
         for (List<SrcDestPair> pairs : Lists.partition(snapshot.getAddressPairs(), BATCH_SIZE)) {
             router.route(new CalculateWork(pairs), getSelf());
         }
@@ -136,11 +136,11 @@ public class Master extends UntypedActor {
 
         reporter.tell(reportBuilder.build(), getSelf());
 
-        for (ActorRef worker : jobWorkers) {
-            getContext().stop(worker);
-        }
-
-        getContext().stop(getSelf());
+//        for (ActorRef worker: jobWorkers) {
+//            getContext().stop(worker);
+//        }
+//
+//        getContext().stop(getSelf());
     }
 
     private boolean noWorkNeeded(SnapshotResult snapshot) {
@@ -149,6 +149,7 @@ public class Master extends UntypedActor {
     }
 
     private void scheduleSnapshot() {
+        reportBuilder = Report.builder();
         router.route(SNAPSHOT_WORK, getSelf());
         getContext().setReceiveTimeout(scala.concurrent.duration.Duration.create("30 second"));
     }
