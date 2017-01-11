@@ -20,6 +20,7 @@ import pojo.json.TrafficStatusDocument;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -85,15 +86,22 @@ public class Worker extends UntypedActor {
 
     private void doCalculateWork(SrcDestPair pair) {
         Instant now = Instant.now();
+        Instant tooOld = now.minus(30, ChronoUnit.DAYS);
         Map<GoogleTravelMode, Duration> trafficStatus = mapDao
                 .getGoogleDirection(pair.getSrcAddress().getFormattedAddress(),
                         pair.getDestAddress().getFormattedAddress(),
+                        now);
+        Map<GoogleTravelMode, Duration> reversedTrafficStatus = mapDao
+                .getGoogleDirection(pair.getDestAddress().getFormattedAddress(),
+                        pair.getSrcAddress().getFormattedAddress(),
                         now);
 
         SourceDestinationPair ddbPair = tableDao.read(pair.getId());
 
         ImmutableTrafficStatusDocument.Builder trafficStatusBuilder = TrafficStatusDocument.builder();
         Map<GoogleTravelMode, List<TrafficStatusDocument.TimeDurationPair>> statusMap =
+                new HashMap<>();
+        Map<GoogleTravelMode, List<TrafficStatusDocument.TimeDurationPair>> reversedStatusMap =
                 new HashMap<>();
 
         trafficStatusBuilder.withSrcAddress(pair.getSrcAddress().getFormattedAddress());
@@ -103,17 +111,38 @@ public class Worker extends UntypedActor {
         // Has previous process results.
         if (ddbPair.getLastUpdateTime().isAfter(Instant.EPOCH)) {
             TrafficStatusDocument previous = trafficStatusDAO.read(pair.getPath());
-            statusMap.putAll(previous.getTrafficStatuses());
+            previous.getTrafficStatuses().entrySet()
+                    .forEach(e -> statusMap.put(e.getKey(), e.getValue()
+                            .stream()
+                            .filter(l -> l.getTime()
+                                    .isAfter(tooOld))
+                            .collect(Collectors.toList())));
+            previous.getReversedTrafficStatuses().entrySet()
+                    .forEach(e -> reversedStatusMap.put(e.getKey(), e.getValue()
+                            .stream()
+                            .filter(l -> l.getTime()
+                                    .isAfter(tooOld))
+                            .collect(Collectors.toList())));
             trafficStatusBuilder.withUpdateCounter(previous.getUpdateCounter() + 1);
         } else {
             trafficStatusBuilder.withUpdateCounter(1);
             for (GoogleTravelMode travelMode: GoogleTravelMode.values()) {
                 statusMap.put(travelMode, new ArrayList<>());
+                reversedStatusMap.put(travelMode, new ArrayList<>());
             }
         }
 
         for (Map.Entry<GoogleTravelMode, Duration> status: trafficStatus.entrySet()) {
             List<TrafficStatusDocument.TimeDurationPair> pairList = statusMap.get(status.getKey());
+            pairList.add(TrafficStatusDocument.TimeDurationPair.builder()
+                    .withTime(now)
+                    .withDuration(status.getValue())
+                    .build());
+            trafficStatusBuilder.putTrafficStatuses(status.getKey(), pairList);
+        }
+
+        for (Map.Entry<GoogleTravelMode, Duration> status: reversedTrafficStatus.entrySet()) {
+            List<TrafficStatusDocument.TimeDurationPair> pairList = reversedStatusMap.get(status.getKey());
             pairList.add(TrafficStatusDocument.TimeDurationPair.builder()
                     .withTime(now)
                     .withDuration(status.getValue())
