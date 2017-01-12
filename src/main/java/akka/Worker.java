@@ -142,7 +142,8 @@ public class Worker extends UntypedActor {
         }
 
         for (Map.Entry<GoogleTravelMode, Duration> status: reversedTrafficStatus.entrySet()) {
-            List<TrafficStatusDocument.TimeDurationPair> pairList = reversedStatusMap.get(status.getKey());
+            List<TrafficStatusDocument.TimeDurationPair> pairList = reversedStatusMap.containsKey(status.getKey()) ?
+                    reversedStatusMap.get(status.getKey()) : new ArrayList<>();
             pairList.add(TrafficStatusDocument.TimeDurationPair.builder()
                     .withTime(now)
                     .withDuration(status.getValue())
