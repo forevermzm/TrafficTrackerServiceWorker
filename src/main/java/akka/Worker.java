@@ -148,7 +148,7 @@ public class Worker extends UntypedActor {
                     .withTime(now)
                     .withDuration(status.getValue())
                     .build());
-            trafficStatusBuilder.putTrafficStatuses(status.getKey(), pairList);
+            trafficStatusBuilder.putReversedTrafficStatuses(status.getKey(), pairList);
         }
 
         trafficStatusDAO.save(pair.getPath(), trafficStatusBuilder.build());
