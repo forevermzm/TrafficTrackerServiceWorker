@@ -20,6 +20,8 @@ import pojo.json.TrafficStatusDocument;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,8 +35,12 @@ public class Worker extends UntypedActor {
 
     private static final int SCAN_LIMIT = 100;
 
-    private static final int UPDATE_INTERVAL = 600;
+    private static final int BUSY_UPDATE_INTERVAL = 600;     // 10 Minutes
+    private static final int LAZY_UPDATE_INTERVAL = 3600;    // 60 Minutes
     private static final int PROCESS_SIZE = 8;
+
+    private static final int NIGHT_TIME = 20;
+    private static final int MORNING_TIME = 6;
 
     private SourceDestinationTableDAO tableDao = new SourceDestinationTableDAO(DynamoFactory.createDDBMapper());
 
@@ -62,10 +68,19 @@ public class Worker extends UntypedActor {
         Instant now = Instant.now();
         LOG.info("Received snapshot work at: " + now);
         return tableDao.scan(SCAN_LIMIT).stream()
-                .filter(s -> s.getLastUpdateTime().isBefore(now.minusSeconds(UPDATE_INTERVAL)))
+                .filter(s -> s.getLastUpdateTime().isBefore(getCheckTimeDeadline(now)))
                 .limit(PROCESS_SIZE)
                 .map(s -> s.getPair())
                 .collect(Collectors.toList());
+    }
+
+    private Instant getCheckTimeDeadline(Instant time) {
+        LocalDateTime localTime = LocalDateTime.ofInstant(time, ZoneId.of("America/Los_Angeles"));
+        if (localTime.getHour() >= NIGHT_TIME || localTime.getHour() < MORNING_TIME) {
+            return time.minusSeconds(LAZY_UPDATE_INTERVAL);
+        } else {
+            return time.minusSeconds(BUSY_UPDATE_INTERVAL);
+        }
     }
 
     private CalculateWorkResult doCalculateWork(CalculateWork work) {
